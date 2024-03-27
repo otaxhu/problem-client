@@ -95,7 +95,7 @@ func TestProblemResponse(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			header := http.Header{}
 			header.Set("Content-Type", tc.ContentType)
-			prob, _ /*extra*/, err := ProblemResponse(http.Response{
+			prob, _ /*extra*/, err := ProblemResponse(&http.Response{
 				StatusCode: tc.StatusCode,
 				Header:     header,
 				Body:       io.NopCloser(strings.NewReader(tc.Body)),
