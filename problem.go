@@ -3,7 +3,6 @@ package problem_client
 import (
 	"encoding/json"
 	"net/http"
-	"reflect"
 )
 
 type Problem struct {
@@ -38,8 +37,8 @@ func ProblemResponse(res http.Response) (*Problem, ExtensionMembers, error) {
 
 	extensionMembers := map[string]any{}
 
-	val := reflect.ValueOf(x)
-	if val.Kind() != reflect.Map {
+	m, ok := x.(map[string]any)
+	if !ok {
 		// "If a member's value type does not match the specified type, the member MUST be ignored"
 		//
 		// https://www.rfc-editor.org/rfc/rfc9457.html#section-3.1-1
@@ -50,47 +49,42 @@ func ProblemResponse(res http.Response) (*Problem, ExtensionMembers, error) {
 		return p, extensionMembers, nil
 	}
 
-	mIter := val.MapRange()
+	for k, v := range m {
 
-	for mIter.Next() {
-
-		mIterVal := mIter.Value()
-
-		// We assert that key is string because JSON objects keys are always string
-		mIterKey := mIter.Key().String()
-
-		switch mIterKey {
+		switch k {
+		case "status":
+			/* No-op */
 
 		case "type":
-			val, ok := mIterVal.Interface().(string)
+			val, ok := v.(string)
 			if !ok {
 				continue
 			}
 			p.Type = val
 
 		case "title":
-			val, ok := mIterVal.Interface().(string)
+			val, ok := v.(string)
 			if !ok {
 				continue
 			}
 			p.Title = val
 
 		case "detail":
-			val, ok := mIterVal.Interface().(string)
+			val, ok := v.(string)
 			if !ok {
 				continue
 			}
 			p.Detail = val
 
 		case "instance":
-			val, ok := mIterVal.Interface().(string)
+			val, ok := v.(string)
 			if !ok {
 				continue
 			}
 			p.Instance = val
 
 		default:
-			extensionMembers[mIterKey] = mIterVal.Interface()
+			extensionMembers[k] = v
 		}
 	}
 
