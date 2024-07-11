@@ -15,6 +15,9 @@ type Problem struct {
 
 type ExtensionMembers map[string]any
 
+// Deprecated: Use ParseResponse instead, it explains much better its purpose and doesn't
+// return errors, this function will call ParseResponse under the hood
+//
 // ProblemResponse reads the header Content-Type, and if it is "application/problem+json", reads
 // the body from the response, parses the JSON as specified in RFC 9457 "Problem Details
 // Specification", closes the body and returns the structure representing the problem details
@@ -27,9 +30,30 @@ type ExtensionMembers map[string]any
 // This function doesn't reads the body if the Content-Type header doesn't match the content type
 // specified before, nor closes the body
 //
-// On the other hand, if that condition matches, this function reads the body and closes the
-// body, even if there was an error parsing the JSON
+// On the other hand, if that condition matches, this function reads the body and ALWAYS closes the
+// body
+//
+// err is always nil
 func ProblemResponse(res *http.Response) (problem *Problem, extensionMembers ExtensionMembers, err error) {
+	problem, extensionMembers = ParseResponse(res)
+	return
+}
+
+// ParseResponse reads the header Content-Type, and if it is "application/problem+json", reads
+// the body from the response, parses the JSON as specified in RFC 9457 "Problem Details
+// Specification", closes the body and returns the structure representing the problem details
+//
+// Also if there was some members that are not part of the specification (known as "Extension
+// Members"), those are gonna be returned in the ExtensionMembers map
+//
+// Notes:
+//
+// This function doesn't reads the body if the Content-Type header doesn't match the content type
+// specified before, nor closes the body
+//
+// On the other hand, if that condition matches, this function reads the body and ALWAYS closes the
+// body
+func ParseResponse(res *http.Response) (p *Problem, memb ExtensionMembers) {
 	if res.Header.Get("Content-Type") != "application/problem+json" {
 		return
 	}
@@ -37,11 +61,9 @@ func ProblemResponse(res *http.Response) (problem *Problem, extensionMembers Ext
 	defer res.Body.Close()
 
 	var x any
-	if err = json.NewDecoder(res.Body).Decode(&x); err != nil {
-		return
-	}
+	json.NewDecoder(res.Body).Decode(&x)
 
-	problem = &Problem{
+	p = &Problem{
 		// "The "status" member, if present, is only advisory; it conveys the HTTP status code
 		// used for the convenience of the consumer."
 		//
@@ -51,7 +73,7 @@ func ProblemResponse(res *http.Response) (problem *Problem, extensionMembers Ext
 		Status: res.StatusCode,
 	}
 
-	extensionMembers = map[string]any{}
+	memb = map[string]any{}
 
 	m, ok := x.(map[string]any)
 	if !ok {
@@ -72,35 +94,19 @@ func ProblemResponse(res *http.Response) (problem *Problem, extensionMembers Ext
 			/* No-op */
 
 		case "type":
-			val, ok := v.(string)
-			if !ok {
-				continue
-			}
-			problem.Type = val
+			p.Type = v.(string)
 
 		case "title":
-			val, ok := v.(string)
-			if !ok {
-				continue
-			}
-			problem.Title = val
+			p.Title = v.(string)
 
 		case "detail":
-			val, ok := v.(string)
-			if !ok {
-				continue
-			}
-			problem.Detail = val
+			p.Detail = v.(string)
 
 		case "instance":
-			val, ok := v.(string)
-			if !ok {
-				continue
-			}
-			problem.Instance = val
+			p.Instance = v.(string)
 
 		default:
-			extensionMembers[k] = v
+			memb[k] = v
 		}
 	}
 
